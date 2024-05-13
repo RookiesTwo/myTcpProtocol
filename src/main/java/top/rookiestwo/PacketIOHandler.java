@@ -20,5 +20,7 @@ public class PacketIOHandler {
     public void sendPacket(byte[] packet) throws SocketException, UnknownHostException, NotOpenException, PcapNativeException {
         MyTcpProtocolMain.requestTimes++;
         handle.sendPacket(packet);
+
+
     }
 }

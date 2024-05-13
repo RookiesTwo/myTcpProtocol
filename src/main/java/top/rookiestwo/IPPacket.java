@@ -34,7 +34,7 @@ public class IPPacket {
     private InetAddress hostIP;
     private InetAddress destinationIP;
 
-    public IPPacket(String DstIP, byte[] Payload) throws UnknownHostException {
+    public IPPacket(String DstIP, int identificationID, byte[] Payload) throws UnknownHostException {
         //初始化
         hostIP = MyTcpProtocolMain.hostIP;
         destinationIP = Inet4Address.getByName(DstIP);
@@ -43,11 +43,7 @@ public class IPPacket {
         versionAndHeaderLength = (byte) 0x45;
         serviceType = (byte) 0x00;
         totalLength = _2ByteArrayBuild(0);//暂且为0
-        // 创建一个随机数生成器
-        Random random = new Random();
-        // 生成一个随机的Identification值（2字节）
-        int identificationRandom = random.nextInt(65535);
-        identification = _2ByteArrayBuild(identificationRandom); // 有可能要分片，分片后续再处理
+        identification = _2ByteArrayBuild(identificationID); // 有可能要分片，分片后续再处理
         flagsAndFragmentOffset = _2ByteArrayBuild(0x4000);// 标志和片偏移,不偏移，不分片因此后两位为00，前两位为40
         ttl = (byte) 0x80;
         protocol = (byte) 0x06;//TCP为6

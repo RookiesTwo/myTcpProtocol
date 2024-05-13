@@ -2,23 +2,26 @@ package top.rookiestwo;
 
 import org.pcap4j.util.MacAddress;
 
-import java.net.InetAddress;
 import java.nio.ByteBuffer;
 
 import static top.rookiestwo.MyTcpProtocolMain._2ByteArrayBuild;
 
-public class EthernetHead {
+public class EthernetPacket {
 
     MacAddress hostMAC;
     MacAddress gatewayMAC;
 
-    public EthernetHead() {
+    byte[] payload;
+
+    public EthernetPacket(byte[] payload) {
         //获得MAC
         hostMAC=MyTcpProtocolMain.hostMAC;
         gatewayMAC=MyTcpProtocolMain.gatewayMAC;
+
+        this.payload=payload;
     }
 
-    public byte[] autoBuild(){
+    public byte[] getEthernetPacket(){
         //构建以太网header
         byte[] gatewayBytes=MyTcpProtocolMain.gatewayMAC.getAddress();
         byte[] hostBytes=hostMAC.getAddress();
@@ -26,8 +29,8 @@ public class EthernetHead {
         byte[] etherType=_2ByteArrayBuild(0x0800);
 
         //合为一个字节数组
-        ByteBuffer buffer=ByteBuffer.allocate(14);
-        buffer.put(gatewayBytes).put(hostBytes).put(etherType);
+        ByteBuffer buffer=ByteBuffer.allocate(14+payload.length);
+        buffer.put(gatewayBytes).put(hostBytes).put(etherType).put(payload);
 
         return buffer.array();
     }

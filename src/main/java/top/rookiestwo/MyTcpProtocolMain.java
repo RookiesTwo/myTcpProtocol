@@ -29,10 +29,10 @@ public class MyTcpProtocolMain {
     public static void main(String[] args) throws SocketException, UnknownHostException, PcapNativeException, NotOpenException {
         //启动时初始化，获取当前网络环境信息
         Initialize();
-        TCPPacket packetBuilder = new TCPPacket();
+        //TCPPacket packetBuilder = new TCPPacket();
         System.out.println("Hello world!");
         byte[] payload= new byte[]{(byte) (0x00)};
-        PacketHandler.sendPacket(packetBuilder.build("155.138.142.54",80,0,-1,null,41953));
+        //PacketHandler.sendPacket(packetBuilder.build("155.138.142.54",80,0,-1,null,41953));
         //System.out.println(Arrays.toString(packetBuilder.generateNewSequenceNumber()));
     }
 

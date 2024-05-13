@@ -17,7 +17,15 @@ public class TCPPacket {
 
     private byte[] sequenceNum;
 
+    public void setSequenceNum(long sequenceNum){
+        this.sequenceNum=_4ByteArrayBuild(sequenceNum);
+    }
+
     private byte[] acknowledgementNumber;
+
+    public void setAcknowledgementNumber(long acknowledgementNumber){
+        this.acknowledgementNumber=_4ByteArrayBuild(acknowledgementNumber);
+    }
 
     //————————16位头部长度、标志位————————
     //TCP头部长度，注意仅有4比特存储长度(因此最大为2^4=16字节)，后4比特中：前三比特为保留位，最后一个比特代表AccurateECN //该变量应该仅用get方法调用！
@@ -73,7 +81,7 @@ public class TCPPacket {
                 .put(_2ByteArrayBuild(maxSegmentSize));
         options=buffer.array();
 
-        tcpHeaderLength+=4;//因为是高位所以需要加16
+        tcpHeaderLength+=4;
         this.setLengthAndFlags();
     }
 
@@ -143,6 +151,8 @@ public class TCPPacket {
         options=new byte[0];
 
         payload=Payload;
+
+        this.fillChecksum();
     }
 
     //将HeaderLength和9个标志位装进2字节数组里
@@ -195,24 +205,9 @@ public class TCPPacket {
         checksum = calculateChecksum(buffer.array());
     }
 
-    //判断指定端口是否可用
-    public static boolean isPortAvailable(int portNumber) {
-        if (portNumber > 65535 || portNumber < 0) return false;
-        try (ServerSocket serverSocket = new ServerSocket(portNumber)) {
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
+/*
 
-    //随机生成一个全新的sequenceNumber，并装进byte数组
-    private byte[] generateNewSequenceNumber() {
-        Random rand = new Random();
-        long sequenceNumber = 0;
-        long quarter = 0xFFFFFFFFL / 4;
-        while (sequenceNumber < quarter || sequenceNumber > quarter * 3) {
-            sequenceNumber = rand.nextLong() & 0xFFFFFFFFL;
-        }
-        return _4ByteArrayBuild(sequenceNumber);
-    }
+
+
+ */
 }
