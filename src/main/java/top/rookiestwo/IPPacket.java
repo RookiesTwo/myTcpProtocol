@@ -8,7 +8,7 @@ import java.util.Random;
 
 import static top.rookiestwo.MyTcpProtocolMain._2ByteArrayBuild;
 
-public class IPHead {
+public class IPPacket {
     private byte versionAndHeaderLength;
 
     private byte serviceType; // 服务类型
@@ -34,7 +34,7 @@ public class IPHead {
     private InetAddress hostIP;
     private InetAddress destinationIP;
 
-    public IPHead(String DstIP, byte[] Payload) throws UnknownHostException {
+    public IPPacket(String DstIP, byte[] Payload) throws UnknownHostException {
         //初始化
         hostIP = MyTcpProtocolMain.hostIP;
         destinationIP = Inet4Address.getByName(DstIP);
@@ -87,6 +87,7 @@ public class IPHead {
 
     //必须先计算TotalLength后才能调用
     public void fillChecksum() {
+        checksum=_2ByteArrayBuild(0);
         ByteBuffer buffer = ByteBuffer.allocate(20 + payload.length);
         buffer.put(getIPHead()).put(payload);
         checksum = calculateChecksum(buffer.array());
@@ -94,7 +95,7 @@ public class IPHead {
 
     //checksum值的计算
     //https://stackoverflow.com/questions/4113890/how-to-calculate-the-internet-checksum-from-a-byte-in-java
-    public byte[] calculateChecksum(byte[] inputData) {
+    public static byte[] calculateChecksum(byte[] inputData) {
         int length = inputData.length;
         int i = 0;
         long sum = 0;

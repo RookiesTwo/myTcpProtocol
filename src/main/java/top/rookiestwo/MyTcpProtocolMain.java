@@ -2,13 +2,13 @@ package top.rookiestwo;
 
 import org.pcap4j.core.NotOpenException;
 import org.pcap4j.core.PcapNativeException;
-import org.pcap4j.packet.TcpPacket;
 import org.pcap4j.util.MacAddress;
 
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 
 public class MyTcpProtocolMain {
     public static InetAddress usingDNS;
@@ -57,9 +57,20 @@ public class MyTcpProtocolMain {
 
     //根据输入的int值,将其转为能存入两个字节的字节数组
     public static byte[] _2ByteArrayBuild(int input){
+        if(input < 0 || input > 65535)throw new NumberFormatException();
         byte[] temp=new byte[2];
         temp[0] = (byte) ((input >> 8) & 0xFF);
         temp[1] = (byte) (input & 0xFF);
         return temp;
+    }
+    //取long的最低4字节塞进字节数组
+    public static byte[] _4ByteArrayBuild(long inputNum) {
+        ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
+        buffer.putLong(inputNum);
+        byte[] array = buffer.array();
+        // We only need the last 4 bytes for a 32-bit number
+        byte[] fourBytes = new byte[4];
+        System.arraycopy(array, 4, fourBytes, 0, 4);
+        return fourBytes;
     }
 }

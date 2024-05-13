@@ -1,20 +1,153 @@
 package top.rookiestwo;
 
-import org.pcap4j.util.MacAddress;
-
 import java.net.*;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Random;
 
 import static top.rookiestwo.MyTcpProtocolMain._2ByteArrayBuild;
+import static top.rookiestwo.MyTcpProtocolMain._4ByteArrayBuild;
 
 public class TCPPacket {
 
-    MacAddress hostMAC;
-    InetAddress hostIP = null;
+    private byte[] srcPort;
 
-    public TCPPacket() throws UnknownHostException, SocketException {
+    private byte[] dstPort;
 
+    private byte[] sequenceNum;
+
+    private byte[] acknowledgementNumber;
+
+    //————————16位头部长度、标志位————————
+    //TCP头部长度，注意仅有4比特存储长度(因此最大为2^4=16字节)，后4比特中：前三比特为保留位，最后一个比特代表AccurateECN //该变量应该仅用get方法调用！
+    private byte tcpHeaderLength;
+
+    //9个特定标志
+    private boolean accurateECN;
+    private boolean congestionWindowReduced;
+    private boolean ecnEcho;
+    private boolean urgent;
+    private boolean acknowledgement;
+    private boolean push;
+    private boolean reset;
+    private boolean syn;
+    private boolean fin;
+
+    //用于整合上面16位的数组
+    private byte[] LengthAndFlags;
+
+    public void setSyn(boolean syn) {
+        this.syn = syn;
+        this.setLengthAndFlags();
+    }
+    public void setFin(boolean fin) {
+        this.fin = fin;
+        this.setLengthAndFlags();
+    }
+    public void setAcknowledgement(boolean acknowledgement) {
+        this.acknowledgement = acknowledgement;
+        this.setLengthAndFlags();
+    }
+    //————————————————————————————————
+
+
+    private byte[] windowSize;//窗口大小
+
+    private byte[] checksum;//校验和，最后再进行计算
+
+    private byte[] urgentPointer;//紧急指针，通常设为0
+
+
+    //——————————各种Options——————————
+    private byte[] options;
+    private byte NOP=(byte)0x01;//Options的占位符
+
+    public void setMaxSegmentSize(int maxSegmentSize) {
+        //保留options之前的内容
+        ByteBuffer buffer = ByteBuffer.allocate(options.length+4);
+        buffer.put(options);
+        //添加新字段
+        buffer.put((byte)0x02)
+                .put((byte)0x04)
+                .put(_2ByteArrayBuild(maxSegmentSize));
+        options=buffer.array();
+    }
+
+    public void setWindowScale(byte scale){
+        ByteBuffer buffer = ByteBuffer.allocate(options.length+4);
+        buffer.put(options);
+
+        buffer.put(NOP)
+                .put((byte)0x03)
+                .put((byte)0x03)
+                .put(_2ByteArrayBuild(scale));
+        options=buffer.array();
+    }
+
+    public void setSACK(){
+        ByteBuffer buffer = ByteBuffer.allocate(options.length+4);
+        buffer.put(options);
+
+        buffer.put(NOP)
+                .put(NOP)
+                .put((byte)0x04)
+                .put((byte)0x02);
+        options=buffer.array();
+    }
+    //——————————————————————————————
+
+    private byte[] payload;
+
+    public TCPPacket(int SrcPort, int DstPort, long SeqNum, long AckNum, byte[] Payload){
+
+        //初始化
+        srcPort=_2ByteArrayBuild(SrcPort);
+        dstPort=_2ByteArrayBuild(DstPort);
+        sequenceNum= _4ByteArrayBuild(SeqNum);
+        acknowledgementNumber= _4ByteArrayBuild(AckNum);
+
+        tcpHeaderLength=(byte)0x50;//默认设为20，有选项添加时在添加选项的方法添加
+
+        accurateECN=false;
+        congestionWindowReduced=false;
+        ecnEcho=false;
+        urgent=false;
+        acknowledgement=false;
+        push=false;
+        reset=false;
+        syn=false;
+        fin=false;
+
+        this.setLengthAndFlags();
+
+        windowSize=_2ByteArrayBuild(8192);//默认设为8192，不对劲以后再说
+        checksum=_2ByteArrayBuild(0);//后续处理
+        urgentPointer=_2ByteArrayBuild(0);//默认设为0
+
+        options=new byte[0];
+
+        payload=Payload;
+    }
+
+    //将HeaderLength和9个标志位装进2字节数组里
+    private void setLengthAndFlags(){
+        int headerFlagsTemp = 0;
+        // 将TCP头部长度左移8位（16 - 8）
+        headerFlagsTemp |= tcpHeaderLength << 8;
+
+        // 填充9个标志位
+        headerFlagsTemp |= ((accurateECN ? 1 : 0)) << 8;
+        headerFlagsTemp |= (congestionWindowReduced ? 1 : 0) << 7;
+        headerFlagsTemp |= (ecnEcho ? 1 : 0) << 6;
+        headerFlagsTemp |= (urgent ? 1 : 0) << 5;
+        headerFlagsTemp |= (acknowledgement ? 1 : 0) << 4;
+        headerFlagsTemp |= (push ? 1 : 0) << 3;
+        headerFlagsTemp |= (reset ? 1 : 0) << 2;
+        headerFlagsTemp |= (syn ? 1 : 0) << 1;
+        headerFlagsTemp |= (fin ? 1 : 0);
+
+        //将TCP头部长度和标志位都装入字节数组内
+        LengthAndFlags = _2ByteArrayBuild(headerFlagsTemp);
     }
 
     //判断指定端口是否可用
@@ -31,28 +164,6 @@ public class TCPPacket {
     public byte[] build(String DstIP, int DstPort, long SequenceNum, long AckNum, byte[] Payload, int SrcPort) throws UnknownHostException {
         //依照老师的要求，手搓数据包
 
-        // 第一步，获取MAC字节码
-
-
-        //手搓ip数据包包头
-        byte versionAndHeaderLength = (byte) 0x45; // 版本和头部长度
-        byte serviceType = (byte) 0x00; // 服务类型
-        byte[] totalLength; // 总长度，后边赋值
-
-        // 创建一个随机数生成器
-        Random random = new Random();
-
-        // 生成一个随机的Identification值（16位）
-        int identificationRandom = random.nextInt(65535);
-        byte[] identification = _2ByteArrayBuild(identificationRandom); // 有可能要分片，分片后续再处理- - - - - - -
-
-        byte[] flagsAndFragmentOffset = _2ByteArrayBuild(0x4000); // 标志和片偏移,不偏移，不分片因此后两位为00，前两位为40
-        byte ttl = (byte) 0x80; // TTL,设定为128次
-        byte protocol = (byte) 0x06; // 协议,TCP为6,即0x06
-        byte[] ipChecksum = _2ByteArrayBuild(0x0000); // 校验和，后续进行验证
-        byte[] srcIP = Inet4Address.getByName(hostIP.getHostAddress()).getAddress();//本机IP
-        byte[] dstIP = Inet4Address.getByName(DstIP).getAddress();//目标hostIP
-
         //手搓TCP包头
         //从49153开始寻找可用端口直到找到
         int portTry = 49153;
@@ -68,19 +179,19 @@ public class TCPPacket {
         if (SequenceNum == 0) {
             sequenceNumber = generateNewSequenceNumber();
         } else {
-            sequenceNumber = longLowTo4Bytes(SequenceNum + 1);
+            sequenceNumber = _4ByteArrayBuild(SequenceNum + 1);
         }
 
         //AckNum，客户端第一次则为0，服务端第一次随机生成，多次则+1
         byte[] acknowledgementNumber = null;
         if (AckNum < 0) {
-            acknowledgementNumber = longLowTo4Bytes(0);
+            acknowledgementNumber = _4ByteArrayBuild(0);
         }
         if (AckNum == 0) {
             acknowledgementNumber = generateNewSequenceNumber();
         }
         if (AckNum > 0) {
-            acknowledgementNumber = longLowTo4Bytes(AckNum + 1);
+            acknowledgementNumber = _4ByteArrayBuild(AckNum + 1);
         }
 
         byte tcpHeaderLength = (byte) 0x80;//TCP头部长度，注意仅有4比特存储长度(因此最大为2^4=16字节)，后4比特中：前三比特为保留位，最后一个比特代表AccurateECN
@@ -200,18 +311,6 @@ public class TCPPacket {
         //以太包头
         buffer.put(new EthernetHead().autoBuild());
 
-        //ip包头
-        buffer.put(versionAndHeaderLength)
-                .put(serviceType)
-                .put(totalLength)
-                .put(identification)
-                .put(flagsAndFragmentOffset)
-                .put(ttl)
-                .put(protocol)
-                .put(ipChecksum)
-                .put(srcIP)
-                .put(dstIP);
-
         //tcp包
         buffer.put(srcPort)
                 .put(dstPort)
@@ -239,18 +338,7 @@ public class TCPPacket {
         while (sequenceNumber < quarter || sequenceNumber > quarter * 3) {
             sequenceNumber = rand.nextLong() & 0xFFFFFFFFL;
         }
-        return longLowTo4Bytes(sequenceNumber);
-    }
-
-    //取long的最低4字节塞进字节数组
-    private byte[] longLowTo4Bytes(long inputNum) {
-        ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
-        buffer.putLong(inputNum);
-        byte[] array = buffer.array();
-        // We only need the last 4 bytes for a 32-bit number
-        byte[] fourBytes = new byte[4];
-        System.arraycopy(array, 4, fourBytes, 0, 4);
-        return fourBytes;
+        return _4ByteArrayBuild(sequenceNumber);
     }
 
     //checksum值的计算
