@@ -54,6 +54,27 @@ public class IPPacket {
         this.postProcess();
     }
 
+    public  IPPacket(byte[] rawPacket){
+        versionAndHeaderLength=rawPacket[14];
+        serviceType=rawPacket[15];
+        totalLength=new byte[2];
+        System.arraycopy(rawPacket,16,totalLength,0,2);
+        identification=new byte[2];
+        System.arraycopy(rawPacket,18,identification,0,2);
+        flagsAndFragmentOffset=new byte[2];
+        System.arraycopy(rawPacket,20,flagsAndFragmentOffset,0,2);
+        ttl=rawPacket[22];
+        protocol=rawPacket[23];
+        checksum=new byte[2];
+        System.arraycopy(rawPacket,24,checksum,0,2);
+        srcIP=new byte[4];
+        System.arraycopy(rawPacket,26,srcIP,0,4);
+        dstIP=new byte[4];
+        System.arraycopy(rawPacket,30,srcIP,0,4);
+        int temp=(totalLength[0]<<8)+totalLength[1];
+        payload=new byte[temp-20];
+        System.arraycopy(rawPacket,34,identification,0,temp-20);
+    }
     //获取IPHead的字节数组
     public byte[] getIPHead() {
         ByteBuffer buffer = ByteBuffer.allocate(20);

@@ -209,6 +209,7 @@ public class TCPPacket {
         this.fillChecksum();
     }
 
+
     //将HeaderLength和9个标志位装进2字节数组里
     private void setLengthAndFlags(){
         int headerFlagsTemp = 0;
@@ -230,6 +231,62 @@ public class TCPPacket {
         LengthAndFlags = _2ByteArrayBuild(headerFlagsTemp);
     }
 
+    public  TCPPacket(byte[] rawPacket){
+        srcPort=new byte[2];
+        System.arraycopy(rawPacket,34,srcPort,0,2);
+        dstPort=new byte[2];
+        System.arraycopy(rawPacket,36,dstPort,0,2);
+        sequenceNum=new byte[4];
+        System.arraycopy(rawPacket,38,sequenceNum,0,4);
+        acknowledgementNumber=new byte[4];
+        System.arraycopy(rawPacket,42,acknowledgementNumber,0,4);
+        LengthAndFlags= new byte[2];
+        System.arraycopy(rawPacket,46,LengthAndFlags,0,2);
+        parseLengthAndFlags();
+        windowSize=new byte[2];
+        System.arraycopy(rawPacket,48,windowSize,0,2);
+        checksum=new byte[2];
+        System.arraycopy(rawPacket,50,checksum,0,2);
+        urgentPointer=new byte[2];
+        System.arraycopy(rawPacket,52,urgentPointer,0,2);
+        options=new byte[tcpHeaderLength-20];
+        System.arraycopy(rawPacket,54,urgentPointer,0,tcpHeaderLength-20);
+        byte[] ipTotalLength=new byte[2];
+        System.arraycopy(rawPacket,16,ipTotalLength,0,2);
+        int temp=(ipTotalLength[0]<<8)+ipTotalLength[1];
+        payload=new byte[temp-20-tcpHeaderLength];
+        System.arraycopy(rawPacket,34+tcpHeaderLength,ipTotalLength,0,temp-20-tcpHeaderLength);
+    }
+    public void parseLengthAndFlags(){
+        tcpHeaderLength=((LengthAndFlags[0]&0xFFFF0000)>>4)*4;
+        if((LengthAndFlags[0]&0x0000000F)==1)accurateECN=true;
+        else accurateECN=false;
+
+        if((LengthAndFlags[1]&0xF0000000)>0)congestionWindowReduced=true;
+        else congestionWindowReduced=false;
+
+        if((LengthAndFlags[1]&0x0F000000)>0)ecnEcho=true;
+        else ecnEcho=false;
+
+        if((LengthAndFlags[1]&0x00F00000)>0)urgent=true;
+        else urgent=false;
+
+        if((LengthAndFlags[1]&0x000F0000)>0)acknowledgement=true;
+        else acknowledgement=false;
+
+        if((LengthAndFlags[1]&0x0000F000)>0)push=true;
+        else push=false;
+
+        if((LengthAndFlags[1]&0x00000F00)>0)reset=true;
+        else reset=false;
+
+        if((LengthAndFlags[1]&0x000000F0)>0)syn=true;
+        else syn=false;
+
+        if((LengthAndFlags[1]&0x0000000F)>0)fin=true;
+        else fin=false;
+
+    }
     //获取整个TCP包
     public byte[] getTCPPacket(){
         ByteBuffer buffer = ByteBuffer.allocate(tcpHeaderLength+payload.length);
