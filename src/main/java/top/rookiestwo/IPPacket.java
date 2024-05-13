@@ -126,6 +126,23 @@ public class IPPacket {
         return buffer.array();
     }
 
+    //获取整个IP数组
+    public byte[] getIPPacket(){
+        ByteBuffer buffer = ByteBuffer.allocate(20+payload.length);
+        buffer.put(versionAndHeaderLength)
+                .put(serviceType)
+                .put(totalLength)
+                .put(identification)
+                .put(flagsAndFragmentOffset)
+                .put(ttl)
+                .put(protocol)
+                .put(checksum)
+                .put(srcIP)
+                .put(dstIP)
+                .put(payload);
+        return buffer.array();
+    }
+
     //IP头后处理，先计算总长度，再计算CheckSum
     public void postProcess() {
         fillTotalLength();
@@ -140,8 +157,8 @@ public class IPPacket {
     //必须先计算TotalLength后才能调用
     public void fillChecksum() {
         checksum = _2ByteArrayBuild(0);
-        ByteBuffer buffer = ByteBuffer.allocate(20 + payload.length);
-        buffer.put(getIPHead()).put(payload);
+        ByteBuffer buffer = ByteBuffer.allocate(20);
+        buffer.put(getIPHead());
         checksum = calculateChecksum(buffer.array());
     }
 }

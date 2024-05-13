@@ -1,9 +1,6 @@
 package top.rookiestwo;
 
-import org.pcap4j.core.PcapHandle;
-import org.pcap4j.core.PcapNativeException;
-import org.pcap4j.core.PcapNetworkInterface;
-import org.pcap4j.core.Pcaps;
+import org.pcap4j.core.*;
 import org.pcap4j.packet.IpPacket;
 
 import java.net.InetAddress;
@@ -26,7 +23,7 @@ public class TCPLink {
     private PcapNetworkInterface.PromiscuousMode mode = PcapNetworkInterface.PromiscuousMode.PROMISCUOUS;
     private PcapHandle handle;
 
-    public TCPLink(InetAddress srcAddr,InetAddress dstAddr,int dstPort) throws PcapNativeException, UnknownHostException {
+    public TCPLink(InetAddress srcAddr,InetAddress dstAddr,int dstPort) throws PcapNativeException, UnknownHostException, NotOpenException {
         //初始化
         this.srcAddr=srcAddr;
         this.dstAddr=dstAddr;
@@ -48,14 +45,25 @@ public class TCPLink {
     }
 
     //三次握手，建立连接
-    private void startHandshake() throws UnknownHostException {
+    private void startHandshake() throws UnknownHostException, NotOpenException, PcapNativeException {
 
+        TCPPacket firstTcpPacket=new TCPPacket(this.dstAddr.getHostName(),this.dstPort,this.srcPort,seqNum,ackNum,new byte[0]);
+        firstTcpPacket.setMaxSegmentSize(1460);
+        firstTcpPacket.setWindowScale((byte)8);
+        firstTcpPacket.setSACK();
+        firstTcpPacket.setSyn(true);
+        firstTcpPacket.fillChecksum();
+
+        IPPacket firstIPPacket=new IPPacket(this.dstAddr.getHostName(),identificationID,firstTcpPacket.getTCPPacket());
+        EthernetPacket firstEthernetPacket=new EthernetPacket(firstIPPacket.getIPPacket());
+        //发包
+        handle.sendPacket(firstEthernetPacket.getEthernetPacket());
     }
 
     //构建一个完整的TCP数据包
-    private byte[] buildWholeTCPPacket(byte[] payload) {
+    //private byte[] buildWholeTCPPacket(byte[] payload) throws UnknownHostException {
 
-    }
+    //}
 
     //获取随机端口
     private int getRandomPort(){

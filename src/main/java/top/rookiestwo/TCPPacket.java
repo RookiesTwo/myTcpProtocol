@@ -33,7 +33,6 @@ public class TCPPacket {
     private byte[] windowSize;//窗口大小
     private byte[] checksum;//校验和，最后再进行计算
     private byte[] urgentPointer;//紧急指针，通常设为0
-    //——————————各种Options——————————
     private byte[] options;
     private byte NOP = (byte) 0x01;//Options的占位符
     private byte[] payload;
@@ -118,7 +117,6 @@ public class TCPPacket {
     public void setAcknowledgementNumber(long acknowledgementNumber) {
         this.acknowledgementNumber = _4ByteArrayBuild(acknowledgementNumber);
     }
-    //————————————————————————————————
 
     public void setTcpHeaderLength(int tcpHeaderLength) {
 
@@ -171,7 +169,6 @@ public class TCPPacket {
         this.acknowledgement = acknowledgement;
         this.setLengthAndFlags();
     }
-    //——————————————————————————————
 
     public void setWindowSize(byte[] windowSize) {
         this.windowSize = windowSize;
@@ -202,7 +199,7 @@ public class TCPPacket {
         buffer.put(NOP)
                 .put((byte) 0x03)
                 .put((byte) 0x03)
-                .put(_2ByteArrayBuild(scale));
+                .put(scale);
         options = buffer.array();
 
         tcpHeaderLength += 4;
@@ -227,7 +224,7 @@ public class TCPPacket {
     private void setLengthAndFlags() {
         int headerFlagsTemp = 0;
         // 将TCP头部长度左移12位（16 - 4）
-        headerFlagsTemp |= (tcpHeaderLength & 0x0000FFFF) << 12;
+        headerFlagsTemp |= ((tcpHeaderLength/4) & 0x0000000F) << 12;
 
         // 填充9个标志位
         headerFlagsTemp |= ((accurateECN ? 1 : 0)) << 8;
@@ -241,11 +238,31 @@ public class TCPPacket {
         headerFlagsTemp |= (fin ? 1 : 0);
 
         //将TCP头部长度和标志位都装入字节数组内
+        //printBits(headerFlagsTemp);
+        //printBits(tcpHeaderLength);
         LengthAndFlags = _2ByteArrayBuild(headerFlagsTemp);
     }
 
-    public void parseLengthAndFlags() {
+    public static void printBits(int number) {
+        // int是32位的，我们从最高位开始检查
+        for (int i = 31; i >= 0; i--) {
+            // 使用移位和掩码来检查每个位
+            int mask = 1 << i;  // 将1左移i位，创建一个只在第i位有1的掩码
+            // 使用&操作符来确定第i位是否是1
+            int result = (number & mask) != 0 ? 1 : 0;
+            System.out.print(result);
+
+            // 每隔4位添加一个空格，使输出更易于阅读
+            if (i % 4 == 0) {
+                System.out.print(" ");
+            }
+        }
+        System.out.println();  // 换行
+    }
+
+    private void parseLengthAndFlags() {
         tcpHeaderLength = ((LengthAndFlags[0] & 0xFFFF0000) >> 4) * 4;
+
         if ((LengthAndFlags[0] & 0x0000000F) == 1) accurateECN = true;
         else accurateECN = false;
 
@@ -272,7 +289,6 @@ public class TCPPacket {
 
         if ((LengthAndFlags[1] & 0x0000000F) > 0) fin = true;
         else fin = false;
-
     }
 
     //获取整个TCP包
@@ -303,10 +319,4 @@ public class TCPPacket {
         buffer.put(this.getTCPPacket());
         checksum = calculateChecksum(buffer.array());
     }
-
-    /*
-
-
-
-     */
 }

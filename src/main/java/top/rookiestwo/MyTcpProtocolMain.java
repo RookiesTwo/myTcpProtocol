@@ -32,6 +32,7 @@ public class MyTcpProtocolMain {
         //TCPPacket packetBuilder = new TCPPacket();
         System.out.println("Hello world!");
         byte[] payload= new byte[]{(byte) (0x00)};
+        TCPLink link=new TCPLink(hostIP,InetAddress.getByName("155.138.142.54"),80);
         //PacketHandler.sendPacket(packetBuilder.build("155.138.142.54",80,0,-1,null,41953));
         //System.out.println(Arrays.toString(packetBuilder.generateNewSequenceNumber()));
     }
