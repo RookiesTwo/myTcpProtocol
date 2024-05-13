@@ -39,7 +39,6 @@ public class TCPPacket {
     //用于构建伪首部的IP信息
     private InetAddress srcIP;
     private InetAddress dstIP;
-
     public TCPPacket(String DstIP, int DstPort, int SrcPort, long SeqNum, long AckNum, byte[] Payload) throws UnknownHostException {
         //初始化
         srcIP = MyTcpProtocolMain.hostIP;
@@ -74,7 +73,6 @@ public class TCPPacket {
 
         this.fillChecksum();
     }
-
     public TCPPacket(byte[] rawPacket) {
         srcPort = new byte[2];
         System.arraycopy(rawPacket, 34, srcPort, 0, 2);
@@ -87,6 +85,7 @@ public class TCPPacket {
         LengthAndFlags = new byte[2];
         System.arraycopy(rawPacket, 46, LengthAndFlags, 0, 2);
         parseLengthAndFlags();
+        //System.out.println(tcpHeaderLength);
         windowSize = new byte[2];
         System.arraycopy(rawPacket, 48, windowSize, 0, 2);
         checksum = new byte[2];
@@ -94,12 +93,86 @@ public class TCPPacket {
         urgentPointer = new byte[2];
         System.arraycopy(rawPacket, 52, urgentPointer, 0, 2);
         options = new byte[tcpHeaderLength - 20];
-        System.arraycopy(rawPacket, 54, urgentPointer, 0, tcpHeaderLength - 20);
+        System.arraycopy(rawPacket, 54, options, 0, tcpHeaderLength - 20);
         byte[] ipTotalLength = new byte[2];
         System.arraycopy(rawPacket, 16, ipTotalLength, 0, 2);
         int temp = (ipTotalLength[0] << 8) + ipTotalLength[1];
         payload = new byte[temp - 20 - tcpHeaderLength];
         System.arraycopy(rawPacket, 34 + tcpHeaderLength, ipTotalLength, 0, temp - 20 - tcpHeaderLength);
+    }
+
+    public static void printBits(int number) {
+        // int是32位的，我们从最高位开始检查
+        for (int i = 31; i >= 0; i--) {
+            // 使用移位和掩码来检查每个位
+            int mask = 1 << i;  // 将1左移i位，创建一个只在第i位有1的掩码
+            // 使用&操作符来确定第i位是否是1
+            int result = (number & mask) != 0 ? 1 : 0;
+            System.out.print(result);
+
+            // 每隔4位添加一个空格，使输出更易于阅读
+            if (i % 4 == 0) {
+                System.out.print(" ");
+            }
+        }
+        System.out.println();  // 换行
+    }
+
+    public boolean getAcknowledgement() {
+        return acknowledgement;
+    }
+
+    public void setAcknowledgement(boolean acknowledgement) {
+        this.acknowledgement = acknowledgement;
+        this.setLengthAndFlags();
+    }
+
+    public long getAcknowledgementNumber() {
+        long temp;
+        temp=((long) (acknowledgementNumber[0]&0xFF)<<24)
+                +((acknowledgementNumber[1]&0xFF)<<16)
+                +((acknowledgementNumber[2]&0xFF)<<8)
+                +(acknowledgementNumber[3]&0xFF);
+        return temp;
+    }
+
+    public void setAcknowledgementNumber(long acknowledgementNumber) {
+        this.acknowledgementNumber = _4ByteArrayBuild(acknowledgementNumber);
+    }
+
+    public long getSequenceNum() {
+        long temp;
+        temp = ((long) (sequenceNum[0] & 0xFF) << 24)
+                + ((sequenceNum[1] & 0xFF) << 16)
+                + ((sequenceNum[2] & 0xFF) << 8)
+                + (sequenceNum[3] & 0xFF);
+        return temp;
+    }
+
+    public void setSequenceNum(long sequenceNum) {
+        this.sequenceNum = _4ByteArrayBuild(sequenceNum);
+    }
+
+    public byte[] getPayload() {
+        return payload;
+    }
+
+    public boolean getSyn() {
+        return syn;
+    }
+
+    public void setSyn(boolean syn) {
+        this.syn = syn;
+        this.setLengthAndFlags();
+    }
+
+    public boolean getFin() {
+        return fin;
+    }
+
+    public void setFin(boolean fin) {
+        this.fin = fin;
+        this.setLengthAndFlags();
     }
 
     public void setSrcPort(int srcPort) {
@@ -108,14 +181,6 @@ public class TCPPacket {
 
     public void setDstPort(int dstPort) {
         this.dstPort = _2ByteArrayBuild(dstPort);
-    }
-
-    public void setSequenceNum(long sequenceNum) {
-        this.sequenceNum = _4ByteArrayBuild(sequenceNum);
-    }
-
-    public void setAcknowledgementNumber(long acknowledgementNumber) {
-        this.acknowledgementNumber = _4ByteArrayBuild(acknowledgementNumber);
     }
 
     public void setTcpHeaderLength(int tcpHeaderLength) {
@@ -152,21 +217,6 @@ public class TCPPacket {
 
     public void setReset(boolean reset) {
         this.reset = reset;
-        this.setLengthAndFlags();
-    }
-
-    public void setSyn(boolean syn) {
-        this.syn = syn;
-        this.setLengthAndFlags();
-    }
-
-    public void setFin(boolean fin) {
-        this.fin = fin;
-        this.setLengthAndFlags();
-    }
-
-    public void setAcknowledgement(boolean acknowledgement) {
-        this.acknowledgement = acknowledgement;
         this.setLengthAndFlags();
     }
 
@@ -224,7 +274,7 @@ public class TCPPacket {
     private void setLengthAndFlags() {
         int headerFlagsTemp = 0;
         // 将TCP头部长度左移12位（16 - 4）
-        headerFlagsTemp |= ((tcpHeaderLength/4) & 0x0000000F) << 12;
+        headerFlagsTemp |= ((tcpHeaderLength / 4) & 0x0000000F) << 12;
 
         // 填充9个标志位
         headerFlagsTemp |= ((accurateECN ? 1 : 0)) << 8;
@@ -243,52 +293,26 @@ public class TCPPacket {
         LengthAndFlags = _2ByteArrayBuild(headerFlagsTemp);
     }
 
-    public static void printBits(int number) {
-        // int是32位的，我们从最高位开始检查
-        for (int i = 31; i >= 0; i--) {
-            // 使用移位和掩码来检查每个位
-            int mask = 1 << i;  // 将1左移i位，创建一个只在第i位有1的掩码
-            // 使用&操作符来确定第i位是否是1
-            int result = (number & mask) != 0 ? 1 : 0;
-            System.out.print(result);
-
-            // 每隔4位添加一个空格，使输出更易于阅读
-            if (i % 4 == 0) {
-                System.out.print(" ");
-            }
-        }
-        System.out.println();  // 换行
-    }
-
     private void parseLengthAndFlags() {
-        tcpHeaderLength = ((LengthAndFlags[0] & 0xFFFF0000) >> 4) * 4;
+        tcpHeaderLength = ((LengthAndFlags[0] & 0xF0) >> 4) * 4;
 
-        if ((LengthAndFlags[0] & 0x0000000F) == 1) accurateECN = true;
-        else accurateECN = false;
+        accurateECN = (LengthAndFlags[0] & 0x01) > 0;
 
-        if ((LengthAndFlags[1] & 0xF0000000) > 0) congestionWindowReduced = true;
-        else congestionWindowReduced = false;
+        congestionWindowReduced = (LengthAndFlags[1] & 0x80) > 0;
 
-        if ((LengthAndFlags[1] & 0x0F000000) > 0) ecnEcho = true;
-        else ecnEcho = false;
+        ecnEcho = (LengthAndFlags[1] & 0x40) > 0;
 
-        if ((LengthAndFlags[1] & 0x00F00000) > 0) urgent = true;
-        else urgent = false;
+        urgent = (LengthAndFlags[1] & 0x20) > 0;
 
-        if ((LengthAndFlags[1] & 0x000F0000) > 0) acknowledgement = true;
-        else acknowledgement = false;
+        acknowledgement = (LengthAndFlags[1] & 0x10) > 0;
 
-        if ((LengthAndFlags[1] & 0x0000F000) > 0) push = true;
-        else push = false;
+        push = (LengthAndFlags[1] & 0x08) > 0;
 
-        if ((LengthAndFlags[1] & 0x00000F00) > 0) reset = true;
-        else reset = false;
+        reset = (LengthAndFlags[1] & 0x04) > 0;
 
-        if ((LengthAndFlags[1] & 0x000000F0) > 0) syn = true;
-        else syn = false;
+        syn = (LengthAndFlags[1] & 0x02) > 0;
 
-        if ((LengthAndFlags[1] & 0x0000000F) > 0) fin = true;
-        else fin = false;
+        fin = (LengthAndFlags[1] & 0x01) > 0;
     }
 
     //获取整个TCP包

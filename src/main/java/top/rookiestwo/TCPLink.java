@@ -1,9 +1,9 @@
 package top.rookiestwo;
 
 import org.pcap4j.core.*;
-import org.pcap4j.packet.IpPacket;
 
 import java.net.InetAddress;
+import java.nio.ByteBuffer;
 import java.util.Random;
 import java.net.*;
 
@@ -23,7 +23,11 @@ public class TCPLink {
     private PcapNetworkInterface.PromiscuousMode mode = PcapNetworkInterface.PromiscuousMode.PROMISCUOUS;
     private PcapHandle handle;
 
-    public TCPLink(InetAddress srcAddr,InetAddress dstAddr,int dstPort) throws PcapNativeException, UnknownHostException, NotOpenException {
+    private boolean serverFinFlag;
+
+    private ByteBuffer inputBuffer;
+
+    public TCPLink(InetAddress srcAddr,InetAddress dstAddr,int dstPort) throws PcapNativeException, UnknownHostException, NotOpenException, InterruptedException {
         //初始化
         this.srcAddr=srcAddr;
         this.dstAddr=dstAddr;
@@ -39,32 +43,114 @@ public class TCPLink {
 
         nif = Pcaps.getDevByAddress(MyTcpProtocolMain.hostIP);
         handle=nif.openLive(snapLen, mode, MyTcpProtocolMain.timeoutTime);
+        handle.setFilter("tcp and src host "+dstAddr.getHostName()+" and src port 80 and dst port "+Integer.toString(this.srcPort),BpfProgram.BpfCompileMode.OPTIMIZE);
+
+        serverFinFlag=false;
+
+        inputBuffer=ByteBuffer.allocate(8192);
 
         //建立三次握手
-        startHandshake();
+        tcpHandshake();
+
+
+
+        close();
     }
 
     //三次握手，建立连接
-    private void startHandshake() throws UnknownHostException, NotOpenException, PcapNativeException {
-
-        TCPPacket firstTcpPacket=new TCPPacket(this.dstAddr.getHostName(),this.dstPort,this.srcPort,seqNum,ackNum,new byte[0]);
-        firstTcpPacket.setMaxSegmentSize(1460);
-        firstTcpPacket.setWindowScale((byte)8);
-        firstTcpPacket.setSACK();
-        firstTcpPacket.setSyn(true);
-        firstTcpPacket.fillChecksum();
-
-        IPPacket firstIPPacket=new IPPacket(this.dstAddr.getHostName(),identificationID,firstTcpPacket.getTCPPacket());
-        EthernetPacket firstEthernetPacket=new EthernetPacket(firstIPPacket.getIPPacket());
+    private void tcpHandshake() throws UnknownHostException, NotOpenException, PcapNativeException {
         //发包
-        handle.sendPacket(firstEthernetPacket.getEthernetPacket());
+        handle.sendPacket(buildHandShakePacket());
+        byte[] secondPacket;
+        while(true){
+            secondPacket=handle.getNextRawPacket();
+            if(secondPacket!=null)break;
+        }
+        //输出
+        System.out.println("接收到的第二个包：");
+        printHex(secondPacket);
+        //解析收到的包
+        TCPPacket secondTcpPacket=new TCPPacket(secondPacket);
+
+        //进行操作
+        if(secondTcpPacket.getSyn()&&secondTcpPacket.getAcknowledgement()){
+            this.ackNum=secondTcpPacket.getSequenceNum();
+            this.ackNum++;
+            this.seqNum++;
+            this.identificationID++;
+        }
+
+        handle.sendPacket(buildHandShakePacket());
+        System.out.println("已成功进行三次握手!");
+    }
+    //构建握手数据包
+    private byte[] buildHandShakePacket() throws UnknownHostException {
+        TCPPacket tcpPacket=new TCPPacket(this.dstAddr.getHostName(),this.dstPort,this.srcPort,this.seqNum,this.ackNum,new byte[0]);
+        if(this.ackNum==0){
+            tcpPacket.setMaxSegmentSize(1460);
+            tcpPacket.setWindowScale((byte)8);
+            tcpPacket.setSACK();
+            tcpPacket.setSyn(true);
+        }
+        if(this.ackNum!=0){
+            tcpPacket.setAcknowledgement(true);
+        }
+        tcpPacket.fillChecksum();
+
+        IPPacket IPPacket=new IPPacket(this.dstAddr.getHostName(),identificationID,tcpPacket.getTCPPacket());
+        EthernetPacket EthernetPacket=new EthernetPacket(IPPacket.getIPPacket());
+        return EthernetPacket.getEthernetPacket();
     }
 
-    //构建一个完整的TCP数据包
-    //private byte[] buildWholeTCPPacket(byte[] payload) throws UnknownHostException {
+    //四次挥手
+    private void close() throws UnknownHostException, NotOpenException, PcapNativeException {
+        handle.sendPacket(buildClosePacket());
+        TCPPacket tcpPacket;
+        byte[] temp;
+        while(true){
+            temp=handle.getNextRawPacket();
+            if(temp==null)continue;
+            else tcpPacket=new TCPPacket(temp);
+            //接收到服务端的Fin信号后
+            if(tcpPacket.getFin()){
+                serverFinFlag=true;
+                this.seqNum++;
+                this.ackNum++;
+                this.identificationID++;
+                break;
+            }
+            inputBuffer.put(tcpPacket.getPayload());
+        }
+        //最后发送认可服务器结束的包
+        handle.sendPacket(buildClosePacket());
+    }
 
-    //}
+    //构建挥手数据包
+    private byte[] buildClosePacket() throws UnknownHostException {
+        TCPPacket tcpPacket=new TCPPacket(this.dstAddr.getHostName(),this.dstPort,this.srcPort,this.seqNum,this.ackNum,new byte[0]);
+        if(!this.serverFinFlag){
+            tcpPacket.setFin(true);
+        }
+        if(this.ackNum!=0){
+            tcpPacket.setAcknowledgement(true);
+        }
+        tcpPacket.fillChecksum();
 
+        IPPacket IPPacket=new IPPacket(this.dstAddr.getHostName(),identificationID,tcpPacket.getTCPPacket());
+        EthernetPacket EthernetPacket=new EthernetPacket(IPPacket.getIPPacket());
+        return EthernetPacket.getEthernetPacket();
+    }
+    //打印数据包用的方法
+    public static void printHex(byte[] bytes) {
+        int i=0;
+        for (byte b : bytes) {
+            System.out.print(String.format("%02X ", b));
+            i++;
+            if(i%8==0)System.out.print("  ");
+            if(i%16==0)System.out.println();
+        }
+        System.out.println();
+    }
     //获取随机端口
     private int getRandomPort(){
         // 定义端口范围

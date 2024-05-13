@@ -24,9 +24,9 @@ public class MyTcpProtocolMain {
     public static int requestTimes=0;//程序从启动开始的请求次数，每次构建包的时候应加1
     //网络配置部分
     public static int timeoutTime=1000;//超时时间，单位为毫秒
-    public static PacketIOHandler PacketHandler;
+    //public static PacketIOHandler PacketHandler;
 
-    public static void main(String[] args) throws SocketException, UnknownHostException, PcapNativeException, NotOpenException {
+    public static void main(String[] args) throws SocketException, UnknownHostException, PcapNativeException, NotOpenException, InterruptedException {
         //启动时初始化，获取当前网络环境信息
         Initialize();
         //TCPPacket packetBuilder = new TCPPacket();
@@ -48,7 +48,7 @@ public class MyTcpProtocolMain {
 
         MyTcpProtocolMain.usingDNS= InetAddress.getByName("1.1.1.1");
 
-        PacketHandler=new PacketIOHandler();
+        //PacketHandler=new PacketIOHandler();
 
         System.out.println();
         System.out.println("[Initial]当前本机IP为: "+MyTcpProtocolMain.hostIP.getHostAddress());
