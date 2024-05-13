@@ -3,24 +3,21 @@ package top.rookiestwo;
 import org.pcap4j.core.*;
 
 import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.Random;
-import java.net.*;
 
 public class TCPLink {
+    int snapLen = 65536;
     private InetAddress srcAddr;
     private InetAddress dstAddr;
     private int srcPort;
     private int dstPort;
-
     private long seqNum;
     private long ackNum;
-
     private int identificationID;
-
     private PcapNetworkInterface nif;
-    int snapLen = 65536;
     private PcapNetworkInterface.PromiscuousMode mode = PcapNetworkInterface.PromiscuousMode.PROMISCUOUS;
     private PcapHandle handle;
 
@@ -28,30 +25,52 @@ public class TCPLink {
 
     private ByteBuffer inputBuffer;
 
-    public TCPLink(InetAddress srcAddr,InetAddress dstAddr,int dstPort) throws PcapNativeException, UnknownHostException, NotOpenException, InterruptedException {
+    public TCPLink(InetAddress srcAddr, InetAddress dstAddr, int dstPort) throws PcapNativeException, UnknownHostException, NotOpenException, InterruptedException {
         //初始化
-        this.srcAddr=srcAddr;
-        this.dstAddr=dstAddr;
-        this.srcPort=getRandomPort();
-        this.dstPort=dstPort;
+        this.srcAddr = srcAddr;
+        this.dstAddr = dstAddr;
+        this.srcPort = getRandomPort();
+        this.dstPort = dstPort;
 
-        seqNum=generateNewSequenceNumber();
-        ackNum=0;
+        seqNum = generateNewSequenceNumber();
+        ackNum = 0;
 
         // 生成一个随机的Identification值（16位）
         Random random = new Random();
         identificationID = random.nextInt(65535);
 
         nif = Pcaps.getDevByAddress(MyTcpProtocolMain.hostIP);
-        handle=nif.openLive(snapLen, mode, MyTcpProtocolMain.timeoutTime);
-        handle.setFilter("tcp and src host "+dstAddr.getHostName()+" and src port 80 and dst port "+Integer.toString(this.srcPort),BpfProgram.BpfCompileMode.OPTIMIZE);
+        handle = nif.openLive(snapLen, mode, MyTcpProtocolMain.timeoutTime);
+        handle.setFilter("tcp and src host " + dstAddr.getHostName() + " and src port 80 and dst port " + Integer.toString(this.srcPort), BpfProgram.BpfCompileMode.OPTIMIZE);
 
-        serverFinFlag=false;
+        serverFinFlag = false;
 
-        inputBuffer=ByteBuffer.allocate(8192);
+        inputBuffer = ByteBuffer.allocate(8192);
 
         //建立三次握手
         tcpHandshake();
+    }
+
+    //打印数据包用的方法
+    public static void printHex(byte[] bytes) {
+        int i = 0;
+        for (byte b : bytes) {
+            System.out.print(String.format("%02X ", b));
+            i++;
+            if (i % 8 == 0) System.out.print("  ");
+            if (i % 16 == 0) System.out.println();
+        }
+        System.out.println();
+    }
+
+    //判断指定端口是否可用
+    private static boolean isPortAvailable(int portNumber) {
+        if (portNumber > 65535 || portNumber < 0) return false;
+        try (ServerSocket serverSocket = new ServerSocket(portNumber)) {
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     //发出HTTP请求
@@ -62,12 +81,12 @@ public class TCPLink {
 
     //接收HTTP响应
     public byte[] receiveHTTPGetResponse() throws NotOpenException, UnknownHostException, PcapNativeException {
-        byte[] response=null;
-        byte[] temp=null;
-        while(response==null){
-            temp=handle.getNextRawPacket();
-            if(temp==null)continue;
-            response=new TCPPacket(temp).getPayload();
+        byte[] response = null;
+        byte[] temp = null;
+        while (response == null) {
+            temp = handle.getNextRawPacket();
+            if (temp == null) continue;
+            response = new TCPPacket(temp).getPayload();
         }
         handle.sendPacket(buildACKPacket(response.length));
         return response;
@@ -75,27 +94,27 @@ public class TCPLink {
 
     //处理服务器的返回确认包
     private void dealACKPacket() throws NotOpenException {
-        byte[] response=null;
-        byte[] temp=null;
-        while(true){
-            temp=handle.getNextRawPacket();
-            if(temp==null)continue;
-            response=new TCPPacket(temp).getPayload();
-            if(response==null)break;
+        byte[] response = null;
+        byte[] temp = null;
+        while (true) {
+            temp = handle.getNextRawPacket();
+            if (temp == null) continue;
+            response = new TCPPacket(temp).getPayload();
+            if (response == null) break;
         }
-        TCPPacket tcpPacket=new TCPPacket(temp);
-        this.seqNum=tcpPacket.getAcknowledgementNumber();
+        TCPPacket tcpPacket = new TCPPacket(temp);
+        this.seqNum = tcpPacket.getAcknowledgementNumber();
     }
 
     //建立确认返回包
     private byte[] buildACKPacket(int length) throws UnknownHostException {
-        this.ackNum+=length;
-        TCPPacket tcpPacket=new TCPPacket(this.dstAddr.getHostName(),this.dstPort,this.srcPort,this.seqNum,this.ackNum,new byte[0]);
+        this.ackNum += length;
+        TCPPacket tcpPacket = new TCPPacket(this.dstAddr.getHostName(), this.dstPort, this.srcPort, this.seqNum, this.ackNum, new byte[0]);
         tcpPacket.setAcknowledgement(true);
         tcpPacket.fillChecksum();
 
-        IPPacket IPPacket=new IPPacket(this.dstAddr.getHostName(),identificationID,tcpPacket.getTCPPacket());
-        EthernetPacket EthernetPacket=new EthernetPacket(IPPacket.getIPPacket());
+        IPPacket IPPacket = new IPPacket(this.dstAddr.getHostName(), identificationID, tcpPacket.getTCPPacket());
+        EthernetPacket EthernetPacket = new EthernetPacket(IPPacket.getIPPacket());
         return EthernetPacket.getEthernetPacket();
     }
 
@@ -104,19 +123,19 @@ public class TCPLink {
         //发包
         handle.sendPacket(buildHandShakePacket());
         byte[] secondPacket;
-        while(true){
-            secondPacket=handle.getNextRawPacket();
-            if(secondPacket!=null)break;
+        while (true) {
+            secondPacket = handle.getNextRawPacket();
+            if (secondPacket != null) break;
         }
         //输出
         System.out.println("接收到的第二个包：");
         printHex(secondPacket);
         //解析收到的包
-        TCPPacket secondTcpPacket=new TCPPacket(secondPacket);
+        TCPPacket secondTcpPacket = new TCPPacket(secondPacket);
 
         //进行操作
-        if(secondTcpPacket.getSyn()&&secondTcpPacket.getAcknowledgement()){
-            this.ackNum=secondTcpPacket.getSequenceNum();
+        if (secondTcpPacket.getSyn() && secondTcpPacket.getAcknowledgement()) {
+            this.ackNum = secondTcpPacket.getSequenceNum();
             this.ackNum++;
             this.seqNum++;
             this.identificationID++;
@@ -128,20 +147,20 @@ public class TCPLink {
 
     //构建握手数据包
     private byte[] buildHandShakePacket() throws UnknownHostException {
-        TCPPacket tcpPacket=new TCPPacket(this.dstAddr.getHostName(),this.dstPort,this.srcPort,this.seqNum,this.ackNum,new byte[0]);
-        if(this.ackNum==0){
+        TCPPacket tcpPacket = new TCPPacket(this.dstAddr.getHostName(), this.dstPort, this.srcPort, this.seqNum, this.ackNum, new byte[0]);
+        if (this.ackNum == 0) {
             tcpPacket.setMaxSegmentSize(1460);
-            tcpPacket.setWindowScale((byte)8);
+            tcpPacket.setWindowScale((byte) 8);
             tcpPacket.setSACK();
             tcpPacket.setSyn(true);
         }
-        if(this.ackNum!=0){
+        if (this.ackNum != 0) {
             tcpPacket.setAcknowledgement(true);
         }
         tcpPacket.fillChecksum();
 
-        IPPacket IPPacket=new IPPacket(this.dstAddr.getHostName(),identificationID,tcpPacket.getTCPPacket());
-        EthernetPacket EthernetPacket=new EthernetPacket(IPPacket.getIPPacket());
+        IPPacket IPPacket = new IPPacket(this.dstAddr.getHostName(), identificationID, tcpPacket.getTCPPacket());
+        EthernetPacket EthernetPacket = new EthernetPacket(IPPacket.getIPPacket());
         return EthernetPacket.getEthernetPacket();
     }
 
@@ -150,13 +169,13 @@ public class TCPLink {
         handle.sendPacket(buildClosePacket());
         TCPPacket tcpPacket;
         byte[] temp;
-        while(true){
-            temp=handle.getNextRawPacket();
-            if(temp==null)continue;
-            else tcpPacket=new TCPPacket(temp);
+        while (true) {
+            temp = handle.getNextRawPacket();
+            if (temp == null) continue;
+            else tcpPacket = new TCPPacket(temp);
             //接收到服务端的Fin信号后
-            if(tcpPacket.getFin()){
-                serverFinFlag=true;
+            if (tcpPacket.getFin()) {
+                serverFinFlag = true;
                 this.seqNum++;
                 this.ackNum++;
                 this.identificationID++;
@@ -171,45 +190,33 @@ public class TCPLink {
 
     //构建挥手数据包
     private byte[] buildClosePacket() throws UnknownHostException {
-        TCPPacket tcpPacket=new TCPPacket(this.dstAddr.getHostName(),this.dstPort,this.srcPort,this.seqNum,this.ackNum,new byte[0]);
-        if(!this.serverFinFlag){
+        TCPPacket tcpPacket = new TCPPacket(this.dstAddr.getHostName(), this.dstPort, this.srcPort, this.seqNum, this.ackNum, new byte[0]);
+        if (!this.serverFinFlag) {
             tcpPacket.setFin(true);
         }
-        if(this.ackNum!=0){
+        if (this.ackNum != 0) {
             tcpPacket.setAcknowledgement(true);
         }
         tcpPacket.fillChecksum();
 
-        IPPacket IPPacket=new IPPacket(this.dstAddr.getHostName(),identificationID,tcpPacket.getTCPPacket());
-        EthernetPacket EthernetPacket=new EthernetPacket(IPPacket.getIPPacket());
+        IPPacket IPPacket = new IPPacket(this.dstAddr.getHostName(), identificationID, tcpPacket.getTCPPacket());
+        EthernetPacket EthernetPacket = new EthernetPacket(IPPacket.getIPPacket());
         return EthernetPacket.getEthernetPacket();
     }
 
     //构建正文数据包
     private byte[] buildTextPacket(byte[] payload) throws UnknownHostException {
-        TCPPacket tcpPacket=new TCPPacket(this.dstAddr.getHostName(),this.dstPort,this.srcPort,this.seqNum,this.ackNum,payload);
-        if(this.ackNum!=0)tcpPacket.setAcknowledgement(true);
+        TCPPacket tcpPacket = new TCPPacket(this.dstAddr.getHostName(), this.dstPort, this.srcPort, this.seqNum, this.ackNum, payload);
+        if (this.ackNum != 0) tcpPacket.setAcknowledgement(true);
         tcpPacket.fillChecksum();
 
-        IPPacket IPPacket=new IPPacket(this.dstAddr.getHostName(),identificationID,tcpPacket.getTCPPacket());
-        EthernetPacket EthernetPacket=new EthernetPacket(IPPacket.getIPPacket());
+        IPPacket IPPacket = new IPPacket(this.dstAddr.getHostName(), identificationID, tcpPacket.getTCPPacket());
+        EthernetPacket EthernetPacket = new EthernetPacket(IPPacket.getIPPacket());
         return EthernetPacket.getEthernetPacket();
     }
 
-    //打印数据包用的方法
-    public static void printHex(byte[] bytes) {
-        int i=0;
-        for (byte b : bytes) {
-            System.out.print(String.format("%02X ", b));
-            i++;
-            if(i%8==0)System.out.print("  ");
-            if(i%16==0)System.out.println();
-        }
-        System.out.println();
-    }
-
     //获取随机端口
-    private int getRandomPort(){
+    private int getRandomPort() {
         // 定义端口范围
         int minPort = 49153;
         int maxPort = 65535;
@@ -219,18 +226,8 @@ public class TCPLink {
         int randomPort = random.nextInt(maxPort - minPort + 1) + minPort;
 
         //判断是否可用
-        if(isPortAvailable(randomPort)) return randomPort;
+        if (isPortAvailable(randomPort)) return randomPort;
         else return getRandomPort();
-    }
-
-    //判断指定端口是否可用
-    private static boolean isPortAvailable(int portNumber) {
-        if (portNumber > 65535 || portNumber < 0) return false;
-        try (ServerSocket serverSocket = new ServerSocket(portNumber)) {
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
     }
 
     //随机生成一个全新的sequenceNumber

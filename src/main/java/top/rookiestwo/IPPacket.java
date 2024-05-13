@@ -127,8 +127,8 @@ public class IPPacket {
     }
 
     //获取整个IP数组
-    public byte[] getIPPacket(){
-        ByteBuffer buffer = ByteBuffer.allocate(20+payload.length);
+    public byte[] getIPPacket() {
+        ByteBuffer buffer = ByteBuffer.allocate(20 + payload.length);
         buffer.put(versionAndHeaderLength)
                 .put(serviceType)
                 .put(totalLength)

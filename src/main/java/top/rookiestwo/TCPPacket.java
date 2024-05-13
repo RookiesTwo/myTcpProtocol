@@ -39,6 +39,7 @@ public class TCPPacket {
     //用于构建伪首部的IP信息
     private InetAddress srcIP;
     private InetAddress dstIP;
+
     public TCPPacket(String DstIP, int DstPort, int SrcPort, long SeqNum, long AckNum, byte[] Payload) throws UnknownHostException {
         //初始化
         srcIP = MyTcpProtocolMain.hostIP;
@@ -73,6 +74,7 @@ public class TCPPacket {
 
         this.fillChecksum();
     }
+
     public TCPPacket(byte[] rawPacket) {
         srcPort = new byte[2];
         System.arraycopy(rawPacket, 34, srcPort, 0, 2);
@@ -129,10 +131,10 @@ public class TCPPacket {
 
     public long getAcknowledgementNumber() {
         long temp;
-        temp=((long) (acknowledgementNumber[0]&0xFF)<<24)
-                +((acknowledgementNumber[1]&0xFF)<<16)
-                +((acknowledgementNumber[2]&0xFF)<<8)
-                +(acknowledgementNumber[3]&0xFF);
+        temp = ((long) (acknowledgementNumber[0] & 0xFF) << 24)
+                + ((acknowledgementNumber[1] & 0xFF) << 16)
+                + ((acknowledgementNumber[2] & 0xFF) << 8)
+                + (acknowledgementNumber[3] & 0xFF);
         return temp;
     }
 
@@ -154,7 +156,7 @@ public class TCPPacket {
     }
 
     public byte[] getPayload() {
-        if(payload.length>0) return payload;
+        if (payload.length > 0) return payload;
         return null;
     }
 
