@@ -4,7 +4,6 @@ import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.util.Random;
 
 import static top.rookiestwo.MyTcpProtocolMain._2ByteArrayBuild;
 
@@ -54,60 +53,26 @@ public class IPPacket {
         this.postProcess();
     }
 
-    public  IPPacket(byte[] rawPacket){
-        versionAndHeaderLength=rawPacket[14];
-        serviceType=rawPacket[15];
-        totalLength=new byte[2];
-        System.arraycopy(rawPacket,16,totalLength,0,2);
-        identification=new byte[2];
-        System.arraycopy(rawPacket,18,identification,0,2);
-        flagsAndFragmentOffset=new byte[2];
-        System.arraycopy(rawPacket,20,flagsAndFragmentOffset,0,2);
-        ttl=rawPacket[22];
-        protocol=rawPacket[23];
-        checksum=new byte[2];
-        System.arraycopy(rawPacket,24,checksum,0,2);
-        srcIP=new byte[4];
-        System.arraycopy(rawPacket,26,srcIP,0,4);
-        dstIP=new byte[4];
-        System.arraycopy(rawPacket,30,srcIP,0,4);
-        int temp=(totalLength[0]<<8)+totalLength[1];
-        payload=new byte[temp-20];
-        System.arraycopy(rawPacket,34,identification,0,temp-20);
-    }
-    //获取IPHead的字节数组
-    public byte[] getIPHead() {
-        ByteBuffer buffer = ByteBuffer.allocate(20);
-        buffer.put(versionAndHeaderLength)
-                .put(serviceType)
-                .put(totalLength)
-                .put(identification)
-                .put(flagsAndFragmentOffset)
-                .put(ttl)
-                .put(protocol)
-                .put(checksum)
-                .put(srcIP)
-                .put(dstIP);
-        return buffer.array();
-    }
-
-    //IP头后处理，先计算总长度，再计算CheckSum
-    public void postProcess() {
-        fillTotalLength();
-        fillChecksum();
-    }
-
-    //计算大小
-    public void fillTotalLength() {
-        totalLength = _2ByteArrayBuild(20 + payload.length);
-    }
-
-    //必须先计算TotalLength后才能调用
-    public void fillChecksum() {
-        checksum=_2ByteArrayBuild(0);
-        ByteBuffer buffer = ByteBuffer.allocate(20 + payload.length);
-        buffer.put(getIPHead()).put(payload);
-        checksum = calculateChecksum(buffer.array());
+    public IPPacket(byte[] rawPacket) {
+        versionAndHeaderLength = rawPacket[14];
+        serviceType = rawPacket[15];
+        totalLength = new byte[2];
+        System.arraycopy(rawPacket, 16, totalLength, 0, 2);
+        identification = new byte[2];
+        System.arraycopy(rawPacket, 18, identification, 0, 2);
+        flagsAndFragmentOffset = new byte[2];
+        System.arraycopy(rawPacket, 20, flagsAndFragmentOffset, 0, 2);
+        ttl = rawPacket[22];
+        protocol = rawPacket[23];
+        checksum = new byte[2];
+        System.arraycopy(rawPacket, 24, checksum, 0, 2);
+        srcIP = new byte[4];
+        System.arraycopy(rawPacket, 26, srcIP, 0, 4);
+        dstIP = new byte[4];
+        System.arraycopy(rawPacket, 30, srcIP, 0, 4);
+        int temp = (totalLength[0] << 8) + totalLength[1];
+        payload = new byte[temp - 20];
+        System.arraycopy(rawPacket, 34, identification, 0, temp - 20);
     }
 
     //checksum值的计算
@@ -143,5 +108,40 @@ public class IPPacket {
         sum = ~sum;
         sum = sum & 0xFFFF;
         return _2ByteArrayBuild((int) sum);
+    }
+
+    //获取IPHead的字节数组
+    public byte[] getIPHead() {
+        ByteBuffer buffer = ByteBuffer.allocate(20);
+        buffer.put(versionAndHeaderLength)
+                .put(serviceType)
+                .put(totalLength)
+                .put(identification)
+                .put(flagsAndFragmentOffset)
+                .put(ttl)
+                .put(protocol)
+                .put(checksum)
+                .put(srcIP)
+                .put(dstIP);
+        return buffer.array();
+    }
+
+    //IP头后处理，先计算总长度，再计算CheckSum
+    public void postProcess() {
+        fillTotalLength();
+        fillChecksum();
+    }
+
+    //计算大小
+    public void fillTotalLength() {
+        totalLength = _2ByteArrayBuild(20 + payload.length);
+    }
+
+    //必须先计算TotalLength后才能调用
+    public void fillChecksum() {
+        checksum = _2ByteArrayBuild(0);
+        ByteBuffer buffer = ByteBuffer.allocate(20 + payload.length);
+        buffer.put(getIPHead()).put(payload);
+        checksum = calculateChecksum(buffer.array());
     }
 }
