@@ -98,7 +98,7 @@ public class TCPPacket {
         System.arraycopy(rawPacket, 16, ipTotalLength, 0, 2);
         int temp = (ipTotalLength[0] << 8) + ipTotalLength[1];
         payload = new byte[temp - 20 - tcpHeaderLength];
-        System.arraycopy(rawPacket, 34 + tcpHeaderLength, ipTotalLength, 0, temp - 20 - tcpHeaderLength);
+        System.arraycopy(rawPacket, 34 + tcpHeaderLength, payload, 0, temp - 20 - tcpHeaderLength);
     }
 
     public static void printBits(int number) {
@@ -154,7 +154,8 @@ public class TCPPacket {
     }
 
     public byte[] getPayload() {
-        return payload;
+        if(payload.length>0) return payload;
+        return null;
     }
 
     public boolean getSyn() {
