@@ -11,10 +11,18 @@ import static top.rookiestwo.IPPacket.calculateChecksum;
 
 public class TCPPacket {
 
+
     private byte[] srcPort;
+
+    public void setSrcPort(int srcPort) {
+        this.srcPort =_2ByteArrayBuild(srcPort);
+    }
 
     private byte[] dstPort;
 
+    public void setDstPort(int  dstPort) {
+        this.dstPort = _2ByteArrayBuild(dstPort);
+    }
     private byte[] sequenceNum;
 
     public void setSequenceNum(long sequenceNum){
@@ -26,6 +34,8 @@ public class TCPPacket {
     public void setAcknowledgementNumber(long acknowledgementNumber){
         this.acknowledgementNumber=_4ByteArrayBuild(acknowledgementNumber);
     }
+
+
 
     //————————16位头部长度、标志位————————
     //TCP头部长度，注意仅有4比特存储长度(因此最大为2^4=16字节)，后4比特中：前三比特为保留位，最后一个比特代表AccurateECN //该变量应该仅用get方法调用！
@@ -45,6 +55,42 @@ public class TCPPacket {
     //用于整合上面16位的数组
     private byte[] LengthAndFlags;
 
+    public void setTcpHeaderLength(int tcpHeaderLength) {
+
+        if(tcpHeaderLength<0||tcpHeaderLength>15)throw new NumberFormatException();
+        this.tcpHeaderLength = tcpHeaderLength;
+        this.setLengthAndFlags();
+    }
+
+    public void setAccurateECN(boolean accurateECN) {
+        this.accurateECN = accurateECN;
+        this.setLengthAndFlags();
+    }
+
+    public void setCongestionWindowReduced(boolean congestionWindowReduced) {
+        this.congestionWindowReduced = congestionWindowReduced;
+        this.setLengthAndFlags();
+    }
+
+    public void setEcnEcho(boolean ecnEcho) {
+        this.ecnEcho = ecnEcho;
+        this.setLengthAndFlags();
+    }
+
+    public void setUrgent(boolean urgent) {
+        this.urgent = urgent;
+        this.setLengthAndFlags();
+    }
+
+    public void setPush(boolean push) {
+        this.push = push;
+        this.setLengthAndFlags();
+    }
+
+    public void setReset(boolean reset) {
+        this.reset = reset;
+        this.setLengthAndFlags();
+    }
     public void setSyn(boolean syn) {
         this.syn = syn;
         this.setLengthAndFlags();
@@ -59,6 +105,14 @@ public class TCPPacket {
     }
     //————————————————————————————————
 
+
+    public void setWindowSize(byte[] windowSize) {
+        this.windowSize = windowSize;
+    }
+
+    public void setUrgentPointer(byte[] urgentPointer) {
+        this.urgentPointer = urgentPointer;
+    }
 
     private byte[] windowSize;//窗口大小
 
