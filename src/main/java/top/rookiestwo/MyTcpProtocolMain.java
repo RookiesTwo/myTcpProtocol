@@ -1,15 +1,14 @@
 package top.rookiestwo;
 
+import org.pcap4j.core.NotOpenException;
 import org.pcap4j.core.PcapNativeException;
+import org.pcap4j.packet.TcpPacket;
 import org.pcap4j.util.MacAddress;
-import org.pcap4j.packet.namednumber.Port;
 
-import java.awt.*;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
-import java.util.Arrays;
 
 public class MyTcpProtocolMain {
     public static InetAddress usingDNS;
@@ -27,12 +26,13 @@ public class MyTcpProtocolMain {
     public static int timeoutTime=1000;//超时时间，单位为毫秒
     public static PacketIOHandler PacketHandler;
 
-    public static void main(String[] args) throws SocketException, UnknownHostException, PcapNativeException {
+    public static void main(String[] args) throws SocketException, UnknownHostException, PcapNativeException, NotOpenException {
         //启动时初始化，获取当前网络环境信息
         Initialize();
-        TCPPacketBuilder packetBuilder = new TCPPacketBuilder();
+        TCPPacket packetBuilder = new TCPPacket();
         System.out.println("Hello world!");
-
+        byte[] payload= new byte[]{(byte) (0x00)};
+        PacketHandler.sendPacket(packetBuilder.build("155.138.142.54",80,0,-1,null,41953));
         //System.out.println(Arrays.toString(packetBuilder.generateNewSequenceNumber()));
     }
 
@@ -53,5 +53,13 @@ public class MyTcpProtocolMain {
         System.out.println("[Initial]当前本机IP为: "+MyTcpProtocolMain.hostIP.getHostAddress());
         System.out.println("[Initial]当前网卡MAC为: "+ MyTcpProtocolMain.hostMAC);
         System.out.println("[Initial]当前使用的DNS服务器IP为: "+ MyTcpProtocolMain.usingDNS.getHostAddress());
+    }
+
+    //根据输入的int值,将其转为能存入两个字节的字节数组
+    public static byte[] _2ByteArrayBuild(int input){
+        byte[] temp=new byte[2];
+        temp[0] = (byte) ((input >> 8) & 0xFF);
+        temp[1] = (byte) (input & 0xFF);
+        return temp;
     }
 }
