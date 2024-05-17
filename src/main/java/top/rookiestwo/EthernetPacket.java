@@ -28,7 +28,7 @@ public class EthernetPacket {
         //ipv4
         byte[] etherType = _2ByteArrayBuild(0x0800);
 
-        //合为一个字节数组
+        //将载荷和以太头合为一个字节数组
         ByteBuffer buffer = ByteBuffer.allocate(14 + payload.length);
         buffer.put(gatewayBytes).put(hostBytes).put(etherType).put(payload);
 

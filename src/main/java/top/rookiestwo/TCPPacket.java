@@ -103,6 +103,7 @@ public class TCPPacket {
         System.arraycopy(rawPacket, 34 + tcpHeaderLength, payload, 0, temp - 20 - tcpHeaderLength);
     }
 
+    //GPT生成的调试用方法
     public static void printBits(int number) {
         // int是32位的，我们从最高位开始检查
         for (int i = 31; i >= 0; i--) {
